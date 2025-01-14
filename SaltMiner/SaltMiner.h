@@ -11,39 +11,68 @@
 class SaltMiner {
 private:
     dpp::cluster* m_bot{};
-    std::unordered_map<dpp::snowflake, Player> m_players{};
+    std::unordered_map<uint64_t, Player> m_players{};
+    FileManager fileManager{};
 
     std::vector<dpp::slashcommand> m_commands{
         {"Mine", "Play Salt Miner.", m_bot->me.id},
-        {"test", "test command", m_bot->me.id}
+        {"Join", "Join a specific world.", m_bot->me.id}
     };
 
     std::string getToken();
 
-    void on_slashcommand_callback(const dpp::slashcommand_t& event);
+    void on_slashcommand(const dpp::slashcommand_t& event);
 
-    dpp::snowflake getPlayerID(std::string componentID) {
-        return static_cast<dpp::snowflake>(std::stoll(componentID.substr(4)));
+    void on_button_click(const dpp::button_click_t& event);
+
+    uint64_t getPlayerID(const std::string componentID) {
+        return std::stoull(componentID.substr(5, 23));
     }
 
-    Player* getPlayer(dpp::guild_member member, std::string componentID) {
-        dpp::snowflake id{getPlayerID(componentID)};
-        return getPlayer(member, id);
+    Player* getCachedPlayer(const std::string componentID) {
+        return getCachedPlayer(getPlayerID(componentID));
     }
 
-    Player* getPlayer(dpp::guild_member member, dpp::snowflake id) {
+    Player* getCachedPlayer(dpp::snowflake id) {
         auto iterator{m_players.find(id)};
+        if (iterator == m_players.end()) { return nullptr; }
+        else { return &iterator->second; }
+    }
 
-        if (iterator == m_players.end()) { 
-            return &m_players.emplace(id, Player{member}).first->second;
+    Player* getPlayer(
+        dpp::guild_member member, 
+        const std::string componentID, 
+        bool createWorld=true
+    ) { return getPlayer(member, getPlayerID(componentID), createWorld); }
+
+    Player* getPlayer(
+        dpp::guild_member member, uint64_t id, bool createWorld=true
+    ) {
+        Player* player{getCachedPlayer(id)};
+
+        if (!player) { 
+            player = &m_players.emplace(id, Player{member}).first->second;
+            if (createWorld) { 
+                player->setWorld(new World{player});
+                player->fileManager.loadSeed(player->getWorld());
+                player->log("created world");
+            }
+            player->log("added to cache.");
         }
 
-        PLOGD << "Player found!";
-        return &iterator->second;
+        // set the world in player
+        // add the player to 0 element in world
+
+        return player;
+    }
+
+    // whether only the invocator of the component can interact with it
+    bool isRestricted(std::string_view componentID) {
+        return componentID[4] == '1';
     }
 
 public:
-    SaltMiner(): m_bot{new dpp::cluster{getToken()}}
+    SaltMiner(): m_bot{new dpp::cluster{getToken()}} 
     {
         m_bot->on_log(dpp::utility::cout_logger());
 
@@ -54,37 +83,15 @@ public:
         });
 
         m_bot->on_slashcommand([this] (const dpp::slashcommand_t& event) {
-            this->on_slashcommand_callback(event);
+            this->on_slashcommand(event);
         });
 
         m_bot->on_button_click([this] (const dpp::button_click_t& event) {
-            
-            Player* player{
-                getPlayer(event.command.member, event.custom_id)
-            };
-            PLOGD << player->pos();
-            dpp::message msg(event.command.channel_id,  "");
-
-            auto tag{UIManager::getComponentTag(event.custom_id)};
-            switch (tag) {
-            case UIConfig::left:
-            case UIConfig::right:
-            case UIConfig::down:
-                player->move(tag);
-
-                player->addUI(&msg, UIConfig::UIName::game);
-
-                msg.add_file("world.jpg", player->compressedWorldImage());
-
-                event.reply(dpp::ir_update_message, msg);
-                break;
-            case UIConfig::portal:
-                break;
-            case UIConfig::backpack:
-                break;
-            }
+            this->on_button_click(event);
         });
     }
 
     void start() { m_bot->start(dpp::st_wait); }
+
+    void joinGame(Player* player, const dpp::button_click_t& event);
 };

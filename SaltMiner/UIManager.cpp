@@ -6,8 +6,6 @@
 
 dpp::component UIManager::addButton(UIConfig::ComponentTag tag) const {
     const UIConfig::Button& button{getButton(tag)};
-    PLOGD << button.emoji.name << ", " << button.emoji.id << ", " << button.label << ".";
-
     return dpp::component()
         .set_label(button.label)
         .set_emoji(button.emoji.name, button.emoji.id)

@@ -1,4 +1,5 @@
 #include <cassert>
+#include <vector>
 
 #include <plog/Log.h>
 #define STB_IMAGE_IMPLEMENTATION
@@ -6,21 +7,7 @@
 
 #include "Random.h"
 #include "World.h"
-
-Tile::Tile() {
-    /* load all tiles into memory. */
-    int _;
-    for (size_t i{0}; i < m_tileName.size(); ++i) {
-        std::string path{
-            "../SaltMiner/images/tiles/" + m_tileName[i] + ".png"
-        };
-        m_tiles[i] = stbi_load(path.c_str(), &_, &_, &_, 3);
-
-        if (m_tiles[i]) { PLOGD << "Success loading " << path; }
-        else { PLOGD << "Failure loading " << path; }
-    }
-    PLOGD << "Finished loading tiles into memory.";
-}
+#include "Player.h"
 
 // draws a tile onto an image
 void World::drawTile(
@@ -37,39 +24,65 @@ void World::drawTile(
     }
 
     const int indexOffset{
-        pos.x * m_tile.widthRGB +
-        pos.y * width * m_tile.heightRGB
+        pos.x * m_tile.dimensionsRGB.x +
+        pos.y * m_tile.dimensionsRGB.y * dimensions.x
     };
-    const uint8_t* tileImage{m_tile.getTile(type)};
+
+    uint8_t* tileImage{m_tile.getTile(type)};
 
     if (!tileImage) {
         throw std::invalid_argument("Error: failed to get tile!");
     }
 
-    for (int y{0}; y < m_tile.height; ++y) {
+    for (int y{0}; y < m_tile.dimensions.y; ++y) {
 
         if (hasAlpha) {
-            for (int x{0}; x < m_tile.widthRGB; x += 3) {
+            for (int x{0}; x < m_tile.dimensionsRGB.x; x += channels) {
 
-                const uint8_t* px = &tileImage[y * m_tile.widthRGB + x];
+                const uint8_t* tilePx = &tileImage[y * m_tile.dimensionsRGB.x + x];
 
-                if (px[0] == 255 && px[1] == 0 && px[2] == 255)
+                if (tilePx[0] == 255 && tilePx[1] == 0 && tilePx[2] == 255)
                 { continue; }
 
                 else {
                     std::memcpy(
-                        &worldImage[y * widthRGB + indexOffset + x],
-                        px, sizeof(uint8_t) * 3
+                        &worldImage[y * dimensionsRGB.x + indexOffset + x],
+                        tilePx, sizeof(uint8_t) * channels
                     );      // need to increase copying amount here
                 }
             }
         }
         else {
             std::memcpy(
-                &worldImage[y * widthRGB + indexOffset],
-                &tileImage[y * m_tile.widthRGB],
-                sizeof(uint8_t) * m_tile.widthRGB
+                &worldImage[y * dimensionsRGB.x + indexOffset],
+                &tileImage[y * m_tile.dimensionsRGB.x],
+                sizeof(uint8_t) * m_tile.dimensionsRGB.x
             );
         }
     }
+}
+
+void World::drawTemplate() {
+    PLOGD << "Drawing template...";
+    for (int x{0}; x < dimensionsGrid.x; ++x) {
+        for (int y{0}; y < dimensionsGrid.y; ++y) {
+            drawTile(m_template, m_tile.dirt, {x, y});
+        }
+    }
+    PLOGD << "Template drawn.";
+}
+
+// if first connection, make owner?
+void World::connect(Player* player) {
+}
+
+void World::clearConnections() {
+    for (Player* player : m_connections) { disconnect(player); }
+}
+
+void World::disconnect(Player* player) {
+    if (player->getWorld() == this) { player->setWorld(nullptr); }
+    
+    auto connection{getConnection(player)};
+    if (isValidConnection(connection)) { m_connections.erase(connection); }
 }

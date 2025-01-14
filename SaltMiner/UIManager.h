@@ -7,7 +7,7 @@
 
 #include "UIConfig.h"
 
-// componentID = <4char tag><18char discord userID if restricted>
+// componentID = <4char tag><0/1 restricted><18char discord userID>
 // creates all interactable UI and processes UI input 
 class UIManager {
 public:
@@ -21,11 +21,11 @@ private:
 	std::string getComponentID(
 		UIConfig::ComponentTag tag, bool restricted=true
 	) const { 
-		return std::to_string(tag + tagStartID) + (restricted ? m_memberID:"");
+		return std::to_string(tag + tagStartID) + 
+			std::to_string(restricted) + m_memberID;
 	}
 
 	const UIConfig::Button& getButton(UIConfig::ComponentTag tag) const {
-
 		return UIConfig::buttons[tag]; 
 	}
 

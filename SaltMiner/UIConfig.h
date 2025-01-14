@@ -10,7 +10,6 @@ namespace UIConfig {
 		right,
 		portal,
 		backpack,
-		join,
 		settings,
 		maxComponentTag
 	};
@@ -44,7 +43,6 @@ namespace UIConfig {
 		{dpp::emoji{"▶️", 0}},
 		{dpp::emoji{"portal", 991751523342225500}},
 		{dpp::emoji{"🎒", 0}},
-		{"Join", false},
 		{dpp::emoji{"⚙️", 0}}
 	};
 
@@ -65,7 +63,7 @@ namespace UIConfig {
 	const std::vector<Rows> UI[static_cast<size_t>(UIName::maxUIName)]{
 		{
 			{RowType::buttons, {left, down, right, portal, backpack}},
-			{RowType::buttons, {join, settings}}
+			{RowType::buttons, {settings}}
 		},
 		{
 			{RowType::buttons, {portal, portal, backpack}},

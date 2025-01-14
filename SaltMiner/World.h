@@ -4,23 +4,32 @@
 #include "Vector2d.h"
 #include "ImageProcessor.h"
 
-// draws tiles onto the game image
+#include <vector>
+
+class Player;
+
+// draws tiles onto and handles the game image
 class World {
 public:
-    inline static constexpr int columns{7};    // default 7
-    inline static constexpr int rows{8};       // default 8
-    inline static constexpr int width{Tile::width * columns};
-    inline static constexpr int height{Tile::height * rows};
-    inline static constexpr int area{width * height};
-    inline static constexpr int widthRGB{width * 3};
-    inline static constexpr int heightRGB{height * 3};
-    inline static constexpr int areaRGB{widthRGB * heightRGB};
+    inline static constexpr int channels{3};
+
+    inline static constexpr Vector2d dimensionsGrid{7, 8};  // default 7, 8
+    inline static constexpr Vector2d dimensions{dimensionsGrid * Tile::dimensions};
+    inline static constexpr Vector2d dimensionsRGB{dimensions * channels};
+
+    inline static constexpr int area{dimensions.area()};
+    inline static constexpr int areaRGB{area * channels};
 
 private:
     const Tile m_tile{};
     const ImageProcessor imageProcessor{};
-    uint8_t* m_template{};
+    inline static uint8_t* m_template{new uint8_t[areaRGB]};
     uint8_t* m_worldImage{};
+
+    inline static int globalSeed{}; // increments per connection
+    uint32_t m_seed{};
+
+    std::vector<Player*> m_connections{}; // element 0 is always owner
 
     void drawTile(
         const Tile::Type type,
@@ -36,29 +45,46 @@ private:
     );
 
 public:
-    World(): 
-        m_template{new uint8_t[areaRGB]}, 
-        m_worldImage{new uint8_t[areaRGB]}
-    {
-        for (int x{0}; x < columns; ++x) {
-            for (int y{0}; y < rows; ++y) {
-                drawTile(m_template, m_tile.dirt, {x, y});
-            }
-        }
-        PLOGD << "Constructed empty template.";
+    // for dummy use
+    World() = default;
 
-        clear();
-    }
+    World(Player* owner):
+        m_worldImage{new uint8_t[areaRGB]}, m_connections{owner} 
+    { clear(); }
+
+    ~World() { delete[] m_worldImage; }
+
+    const uint32_t getSeed() const { return m_seed; }
+
+    void setSeed(uint32_t seed) { m_seed = seed; }
+
+    void drawTemplate();
 
     const uint8_t* image() const { return m_worldImage; }
 
     const std::string_view compressedImage() const { 
-        return imageProcessor.compress(m_worldImage, width, height);
+        return imageProcessor.compress(m_worldImage , dimensions);
     }
 
-    void drawGuy(Vector2d pos) {
-        drawTile(m_tile.guy, pos, true);
-    }
+    void drawGuy(Vector2d pos) { drawTile(m_tile.guy, pos, true); }
 
     void clear() { std::memcpy(m_worldImage, m_template, areaRGB); }
+
+    Tile tile() { return m_tile; }
+
+    const Player* getOwner() const { return m_connections[0]; }
+
+    auto getConnection(Player* player) {
+        return std::find(m_connections.begin(), m_connections.end(), player);
+    }
+
+    bool isValidConnection(auto it) { return it == m_connections.end(); }
+
+    void disconnect(Player* player);
+
+    void clearConnections();
+
+    void connect(Player* player);
+
+    bool isOwner(Player* player) { return m_connections[0] == player; }
 };
